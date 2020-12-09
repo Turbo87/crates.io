@@ -36,6 +36,9 @@ module.exports = function (defaults) {
     babel: {
       plugins: [require.resolve('ember-auto-import/babel-plugin')],
     },
+    'ember-cli-babel': {
+      includeExternalHelpers: true,
+    },
     'ember-fetch': {
       preferNative: true,
     },

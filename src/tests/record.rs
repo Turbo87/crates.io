@@ -79,6 +79,7 @@ fn cache_file(name: &str) -> PathBuf {
         .join(name)
 }
 
+#[derive(Debug)]
 enum Record {
     Capture(Vec<Exchange>, PathBuf),
     Replay(Vec<Exchange>),
@@ -206,13 +207,13 @@ impl<'a> tower_service::Service<&'a TcpStream> for Proxy {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Exchange {
     request: RecordedRequest,
     response: RecordedResponse,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct RecordedRequest {
     uri: String,
     method: String,
@@ -220,7 +221,7 @@ struct RecordedRequest {
     body: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct RecordedResponse {
     status: u16,
     headers: HashSet<(String, String)>,

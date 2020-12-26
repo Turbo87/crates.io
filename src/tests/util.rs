@@ -352,6 +352,16 @@ pub trait RequestHelper {
         self.run(request)
     }
 
+    /// Issue a POST request
+    fn post<T>(&self, path: &str, body: &[u8]) -> Response<T>
+    where
+        for<'de> T: serde::Deserialize<'de>,
+    {
+        let mut request = self.request_builder(Method::POST, path);
+        request.with_body(body);
+        self.run(request)
+    }
+
     /// Issue a DELETE request
     fn delete<T>(&self, path: &str) -> Response<T>
     where

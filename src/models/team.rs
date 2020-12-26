@@ -163,7 +163,7 @@ impl Team {
 
         let org_id = team.organization.id;
 
-        if !team_with_gh_id_contains_user(app, org_id, team.id, req_user)? {
+        if !Team::with_gh_id_contains_user(app, org_id, team.id, req_user)? {
             return Err(cargo_err("only members of a team can add it as an owner"));
         }
 
@@ -192,7 +192,7 @@ impl Team {
     /// private membership information here.
     pub fn contains_user(&self, app: &App, user: &User) -> AppResult<bool> {
         match self.org_id {
-            Some(org_id) => team_with_gh_id_contains_user(app, org_id, self.github_id, user),
+            Some(org_id) => Team::with_gh_id_contains_user(app, org_id, self.github_id, user),
             // This means we don't have an org_id on file for the `self` team. It much
             // probably was deleted from github by the time we backfilled the database.
             // Short-circuiting to false since a non-existent team cannot contain any
@@ -232,34 +232,34 @@ impl Team {
             url: Some(url),
         }
     }
-}
 
-fn team_with_gh_id_contains_user(
-    app: &App,
-    github_org_id: i32,
-    github_team_id: i32,
-    user: &User,
-) -> AppResult<bool> {
-    // GET /organizations/:org_id/team/:team_id/memberships/:username
-    // check that "state": "active"
+    pub fn with_gh_id_contains_user(
+        app: &App,
+        github_org_id: i32,
+        github_team_id: i32,
+        user: &User,
+    ) -> AppResult<bool> {
+        // GET /organizations/:org_id/team/:team_id/memberships/:username
+        // check that "state": "active"
 
-    #[derive(Deserialize)]
-    struct Membership {
-        state: String,
+        #[derive(Deserialize)]
+        struct Membership {
+            state: String,
+        }
+
+        let url = format!(
+            "/organizations/{}/team/{}/memberships/{}",
+            &github_org_id, &github_team_id, &user.gh_login
+        );
+        let token = AccessToken::new(user.gh_access_token.clone());
+        let membership = match github_api::<Membership>(app, &url, &token) {
+            // Officially how `false` is returned
+            Err(ref e) if e.is::<NotFound>() => return Ok(false),
+            x => x?,
+        };
+
+        // There is also `state: pending` for which we could possibly give
+        // some feedback, but it's not obvious how that should work.
+        Ok(membership.state == "active")
     }
-
-    let url = format!(
-        "/organizations/{}/team/{}/memberships/{}",
-        &github_org_id, &github_team_id, &user.gh_login
-    );
-    let token = AccessToken::new(user.gh_access_token.clone());
-    let membership = match github_api::<Membership>(app, &url, &token) {
-        // Officially how `false` is returned
-        Err(ref e) if e.is::<NotFound>() => return Ok(false),
-        x => x?,
-    };
-
-    // There is also `state: pending` for which we could possibly give
-    // some feedback, but it's not obvious how that should work.
-    Ok(membership.state == "active")
 }

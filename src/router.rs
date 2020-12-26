@@ -123,6 +123,9 @@ pub fn build_router(app: &App) -> R404 {
     );
     router.delete("/api/private/session", C(user::session::logout));
 
+    // Admin tools
+    router.post("/api/private/admin/pager-duty", C(admin::pager_duty));
+
     // Only serve the local checkout of the git index in development mode.
     // In production, for crates.io, cargo gets the index from
     // https://github.com/rust-lang/crates.io-index directly.

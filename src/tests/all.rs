@@ -36,6 +36,7 @@ use diesel::prelude::*;
 use reqwest::{blocking::Client, Proxy};
 
 mod account_lock;
+mod admin;
 mod authentication;
 mod badge;
 mod builders;

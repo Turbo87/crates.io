@@ -1,0 +1,129 @@
+[
+  {
+    "request": {
+      "uri": "http://api.github.com/organizations/13/team/41/memberships/foo",
+      "method": "GET",
+      "headers": [
+        [
+          "host",
+          "api.github.com"
+        ],
+        [
+          "accept",
+          "application/vnd.github.v3+json"
+        ],
+        [
+          "accept-encoding",
+          "gzip"
+        ],
+        [
+          "authorization",
+          "token 7534f8b996e3a3f800f0a324f619adba12a74532"
+        ]
+      ],
+      "body": ""
+    },
+    "response": {
+      "status": 200,
+      "headers": [
+        [
+          "content-type",
+          "application/json; charset=utf-8"
+        ],
+        [
+          "Access-Control-Allow-Origin",
+          "*"
+        ],
+        [
+          "X-XSS-Protection",
+          "1; mode=block"
+        ],
+        [
+          "X-content-type-Options",
+          "nosniff"
+        ],
+        [
+          "X-RateLimit-Remaining",
+          "4972"
+        ],
+        [
+          "X-RateLimit-Limit",
+          "5000"
+        ],
+        [
+          "Content-Security-Policy",
+          "default-src 'none'"
+        ],
+        [
+          "X-GitHub-Request-Id",
+          "CB3E:6F2D:2A3E57:5FAD43:59D4F801"
+        ],
+        [
+          "X-OAuth-Client-Id",
+          "89b6afdeaa6c6c7506ec"
+        ],
+        [
+          "Strict-Transport-Security",
+          "max-age=31536000; includeSubdomains; preload"
+        ],
+        [
+          "date",
+          "Wed, 04 Oct 2017 15:02:25 GMT"
+        ],
+        [
+          "X-Runtime-rack",
+          "0.034188"
+        ],
+        [
+          "X-GitHub-Media-Type",
+          "github.v3; format=json"
+        ],
+        [
+          "X-accepted-OAuth-Scopes",
+          "admin:org, read:org, repo, write:org"
+        ],
+        [
+          "ETag",
+          "\"a004da562b1c421613f0ca38f7a9bf2f\""
+        ],
+        [
+          "Server",
+          "GitHub.com"
+        ],
+        [
+          "Access-Control-Expose-Headers",
+          "ETag, Link, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes, X-accepted-OAuth-Scopes, X-Poll-Interval"
+        ],
+        [
+          "X-RateLimit-Reset",
+          "1507132377"
+        ],
+        [
+          "Status",
+          "200 OK"
+        ],
+        [
+          "Vary",
+          "accept, authorization, Cookie, X-GitHub-OTP"
+        ],
+        [
+          "X-OAuth-Scopes",
+          "read:org"
+        ],
+        [
+          "X-Frame-Options",
+          "deny"
+        ],
+        [
+          "Cache-Control",
+          "private, max-age=60, s-maxage=60"
+        ],
+        [
+          "content-length",
+          "111"
+        ]
+      ],
+      "body": "eyJzdGF0ZSI6ImFjdGl2ZSIsInJvbGUiOiJtYWludGFpbmVyIiwidXJsIjoiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS90ZWFtcy8xNjk5Mzc3L21lbWJlcnNoaXBzL2NyYXRlcy10ZXN0ZXItMiJ9"
+    }
+  }
+]

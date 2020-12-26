@@ -92,6 +92,7 @@ pub fn proxy() -> (String, Bomb) {
     let (url_tx, url_rx) = mpsc::channel();
 
     let data = cache_file(&me.replace("::", "_"));
+    println!("{:?} {:?}", data, data.exists());
     let record = if record && !data.exists() {
         Record::Capture(Vec::new(), data)
     } else if !data.exists() {
@@ -101,13 +102,16 @@ pub fn proxy() -> (String, Bomb) {
         assert_ok!(assert_ok!(File::open(&data)).read_to_end(&mut body));
         Record::Replay(serde_json::from_slice(&body).unwrap())
     };
+    println!("{:#?}", record);
 
     let sink = Arc::new(Mutex::new(Vec::new()));
     let sink2 = Sink(Arc::clone(&sink));
 
     let (quittx, quitrx) = oneshot::channel();
 
+    println!("th2");
     let thread = thread::spawn(move || {
+        println!("th233");
         let mut rt = assert_ok!(runtime::Builder::new()
             .basic_scheduler()
             .enable_io()
@@ -125,6 +129,8 @@ pub fn proxy() -> (String, Bomb) {
             .unwrap();
 
         let record = Arc::new(Mutex::new(record));
+
+        println!("srv");
         let srv = Server::builder(hyper::server::accept::from_stream(listener.incoming()))
             .serve(Proxy {
                 sink: sink2,
@@ -135,7 +141,9 @@ pub fn proxy() -> (String, Bomb) {
                 quitrx.await.ok();
             });
 
+        println!("srv2");
         rt.block_on(srv).ok();
+        println!("srv3");
 
         let record = record.lock().unwrap();
         match *record {
@@ -174,6 +182,7 @@ impl tower_service::Service<Request<Body>> for Proxy {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        println!("call");
         match *self.record.lock().unwrap() {
             Record::Capture(_, _) => {
                 let client = self.client.as_ref().unwrap().clone();
@@ -292,6 +301,9 @@ fn replay_http(
     stdout: &mut dyn Write,
 ) -> impl Future<Output = Result<Response<Body>, Error>> + Send {
     static IGNORED_HEADERS: &[&str] = &["authorization", "date", "cache-control"];
+
+    println!("{:#?}", req);
+    println!("{:#?}", exchange);
 
     assert_eq!(req.uri().to_string(), exchange.request.uri);
     assert_eq!(req.method().to_string(), exchange.request.method);

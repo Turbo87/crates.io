@@ -1,15 +1,13 @@
 {
     "extends": [
-        "config:js-app",
+        "config:base",
+        ":pinAllExceptPeerDependencies",
         ":dependencyDashboard",
         ":maintainLockFilesWeekly",
         ":prConcurrentLimitNone",
         ":prHourlyLimitNone",
         ":semanticCommitsDisabled"
     ],
-    "docker": {
-        "enabled": false
-    },
     "js": {
         "labels": ["A-frontend"],
         "reviewers": ["locks", "pichfl", "Turbo87"],
@@ -26,6 +24,9 @@
     }, {
         "matchPackageNames": ["@percy/cli", "webpack"],
         "extends": ["schedule:weekly"]
+    }, {
+        "matchLanguages": ["rust"],
+        "rangeStrategy": "bump"
     }, {
         "matchLanguages": ["rust"],
         "matchUpdateTypes": ["lockFileMaintenance"],

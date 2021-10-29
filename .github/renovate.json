@@ -46,7 +46,8 @@
     }, {
         "matchLanguages": ["rust"],
         "matchUpdateTypes": ["lockFileMaintenance"],
-        "groupName": " Lock file maintenance (Rust)"
+        "additionalBranchPrefix": "rust-",
+        "commitMessageSuffix": "(Rust)"
     }, {
         "matchManagers": ["regex"],
         "matchPackageNames": ["rust"],

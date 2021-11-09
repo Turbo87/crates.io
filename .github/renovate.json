@@ -66,6 +66,11 @@
         "commitMessageTopic": "Rust",
         "labels": ["A-backend"]
     }, {
+        "matchPackageNames": ["node"],
+        "groupName": "node",
+        "commitMessageTopic": "Node.js",
+        "labels": ["A-frontend"]
+    }, {
         "matchPackagePatterns": [
             "^conduit$",
             "^conduit-",

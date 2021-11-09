@@ -66,6 +66,11 @@
         "commitMessageTopic": "Rust",
         "labels": ["A-backend"]
     }, {
+        "matchPackageNames": ["node"],
+        "commitMessageTopic": "Node.js",
+        "versioning": "semver",
+        "labels": ["A-frontend"]
+    }, {
         "matchPackagePatterns": [
             "^conduit$",
             "^conduit-",

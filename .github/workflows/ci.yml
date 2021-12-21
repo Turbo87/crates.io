@@ -10,7 +10,7 @@ on:
   pull_request:
 
 env:
-  DIESEL_CLI_VERSION: 1.4.0
+  DIESEL_CLI_VERSION: 1.4.1
   NODE_VERSION: 16.13.1
   RUST_VERSION: 1.57.0
 

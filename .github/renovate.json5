@@ -12,6 +12,10 @@
         "customManagers:githubActionsVersions",
         "github>Turbo87/renovate-config//rust/updateToolchain",
     ],
+    "dockerfile": {
+        // This has been causing various issues, unfortunately.
+        enabled: false,
+    },
     packageRules: [
         {
             matchCategories: ["rust"],
@@ -64,18 +68,6 @@
         {
             matchDepNames: ["aws-ip-ranges", "github-meta"],
             automerge: true,
-        },
-        {
-            matchUpdateTypes: ["digest"],
-            enabled: false,
-        },
-        {
-            // This is causing weird "Cannot find replaceString in current file content" errors,
-            // so we disable it for now.
-            matchFileNames: ["frontend.Dockerfile"],
-            matchDatasources: ["docker"],
-            matchUpdateTypes: ["pinDigest"],
-            enabled: false
         },
     ],
 }

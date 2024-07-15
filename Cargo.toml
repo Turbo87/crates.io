@@ -85,8 +85,9 @@ http = "=1.1.0"
 http-body-util = "=0.1.2"
 hyper = { version = "=1.4.1", features = ["client", "http1"] }
 indexmap = { version = "=2.4.0", features = ["serde"] }
-indicatif = "=0.17.8"
+indicatif = { version = "=0.17.8", features = ["rayon"] }
 ipnetwork = "=0.20.0"
+itertools = "=0.13.0"
 tikv-jemallocator = { version = "=0.6.0", features = ['unprefixed_malloc_on_supported_platforms', 'profiling'] }
 lettre = { version = "=0.11.7", default-features = false, features = ["file-transport", "smtp-transport", "native-tls", "hostname", "builder"] }
 minijinja = "=2.1.2"
@@ -101,6 +102,7 @@ postgres-native-tls = "=0.5.0"
 prometheus = { version = "=0.13.4", default-features = false }
 quick-xml = "=0.36.1"
 rand = "=0.8.5"
+rayon = "=1.10.0"
 reqwest = { version = "=0.12.7", features = ["blocking", "gzip", "json"] }
 rss = { version = "=2.0.8", default-features = false, features = ["atom"] }
 scheduled-thread-pool = "=0.2.7"

@@ -85,8 +85,9 @@ http = "=1.1.0"
 http-body-util = "=0.1.2"
 hyper = { version = "=1.5.1", features = ["client", "http1"] }
 indexmap = { version = "=2.7.0", features = ["serde"] }
-indicatif = "=0.17.9"
+indicatif = { version = "=0.17.9", features = ["rayon"] }
 ipnetwork = "=0.20.0"
+itertools = "=0.13.0"
 json-subscriber = "=0.2.3"
 krata-tokio-tar = "=0.4.2"
 lettre = { version = "=0.11.10", default-features = false, features = ["file-transport", "smtp-transport", "hostname", "builder", "tokio1", "tokio1-native-tls"] }
@@ -101,6 +102,7 @@ paste = "=1.0.15"
 postgres-native-tls = "=0.5.0"
 prometheus = { version = "=0.13.4", default-features = false }
 rand = "=0.8.5"
+rayon = "=1.10.0"
 reqwest = { version = "=0.12.9", features = ["gzip", "json"] }
 rss = { version = "=2.0.11", default-features = false, features = ["atom"] }
 secrecy = "=0.10.3"

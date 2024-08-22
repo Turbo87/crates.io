@@ -1,5 +1,6 @@
 use crates_io::db;
 use crates_io::schema::{crates, versions};
+use crates_io::sql::array_length;
 use diesel::prelude::*;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use itertools::Itertools;
@@ -34,10 +35,15 @@ fn main() -> anyhow::Result<()> {
     let mut conn = db::oneoff_connection()?;
 
     info!("Fetching versions without lib/bin information from the database…");
-    let versions: Vec<(i32, String, String)> = versions::table
+    let versions: Vec<(i32, String, String, i32)> = versions::table
         .inner_join(crates::table)
-        .select((versions::id, crates::name, versions::num))
-        .filter(versions::has_lib.is_null())
+        .select((
+            versions::id,
+            crates::name,
+            versions::num,
+            array_length(versions::bin_names.assume_not_null(), 1),
+        ))
+        .filter(array_length(versions::bin_names.assume_not_null(), 1).gt(1))
         .get_results(&mut conn)?;
 
     info!("Reading processed versions from CSV file…");
@@ -46,8 +52,10 @@ fn main() -> anyhow::Result<()> {
     info!("Filtering out already processed versions…");
     let versions: Vec<_> = versions
         .into_iter()
-        .filter(|(version_id, _, _)| !processed_versions.contains(version_id))
+        .filter(|(version_id, _, _, _)| !processed_versions.contains(version_id))
         .collect();
+
+    info!("Processing {} versions…", versions.len());
 
     let (tx, rx) = channel::<(i32, bool, Vec<String>)>();
 
@@ -78,10 +86,8 @@ fn main() -> anyhow::Result<()> {
     pb.set_style(ProgressStyle::with_template(template).unwrap());
 
     info!("Processing versions…");
-    versions
-        .par_iter()
-        .progress_with(pb.clone())
-        .for_each(|(version_id, name, version)| {
+    versions.par_iter().progress_with(pb.clone()).for_each(
+        |(version_id, name, version, num_bins)| {
             let path = Path::new(CRATES_ROOT_DIR)
                 .join(crates_io_index::Repository::relative_index_file(name))
                 .join(format!("{name}-{version}.crate"));
@@ -110,10 +116,13 @@ fn main() -> anyhow::Result<()> {
                 .bin
                 .into_iter()
                 .filter_map(|bin| bin.name.clone())
-                .collect();
+                .collect::<Vec<_>>();
 
-            tx.send((*version_id, has_lib, bin_names)).unwrap();
-        });
+            if bin_names.len() != *num_bins as usize {
+                tx.send((*version_id, has_lib, bin_names)).unwrap();
+            }
+        },
+    );
 
     drop(tx);
     handle.join().unwrap();
@@ -151,8 +160,8 @@ fn main() -> anyhow::Result<()> {
             sql_file,
             "where id = tmp.version_id and versions.has_lib is null;"
         )?;
-        writeln!(sql_file)?;
-        writeln!(sql_file, "select pg_sleep(.25);")?;
+        // writeln!(sql_file)?;
+        // writeln!(sql_file, "select pg_sleep(.25);")?;
         writeln!(sql_file)?;
     }
 

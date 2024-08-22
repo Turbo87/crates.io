@@ -1,4 +1,4 @@
-use diesel::sql_types::{Date, Double, Integer, Interval, SingleValue, Text, Timestamp};
+use diesel::sql_types::{Array, Date, Double, Integer, Interval, SingleValue, Text, Timestamp};
 
 mod semver;
 
@@ -17,6 +17,7 @@ define_sql_function!(fn floor(x: Double) -> Integer);
 define_sql_function!(fn greatest<T: SingleValue>(x: T, y: T) -> T);
 define_sql_function!(fn least<T: SingleValue>(x: T, y: T) -> T);
 define_sql_function!(fn split_part(string: Text, delimiter: Text, n: Integer) -> Text);
+define_sql_function!(fn array_length<T>(array: Array<T>, dimension: Integer) -> Integer);
 
 macro_rules! pg_enum {
     (

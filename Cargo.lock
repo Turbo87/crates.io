@@ -209,6 +209,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compression"
+version = "0.4.15"
+source = "git+https://github.com/Nullus157/async-compression?branch=fix/panic#cb122d412f3fc03b9fb704feb73a8957b652b148"
+dependencies = [
+ "flate2",
+ "futures-core",
+ "memchr",
+ "pin-project-lite",
+ "tokio",
+ "zstd",
+ "zstd-safe",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1074,7 +1088,7 @@ name = "crates_io_cdn_logs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "async-compression",
+ "async-compression 0.4.15",
  "chrono",
  "claims",
  "clap",
@@ -3875,7 +3889,7 @@ version = "0.12.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f713147fbe92361e52392c73b8c9e48c04c6625bce969ef54dc901e58e042a7b"
 dependencies = [
- "async-compression",
+ "async-compression 0.4.13",
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
@@ -5034,7 +5048,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8437150ab6bbc8c5f0f519e3d5ed4aa883a83dd4cdd3d1b21f9482936046cb97"
 dependencies = [
- "async-compression",
+ "async-compression 0.4.13",
  "bitflags 2.6.0",
  "bytes",
  "futures-core",

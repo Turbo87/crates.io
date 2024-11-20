@@ -13,6 +13,8 @@ use diesel::pg::Pg;
 use diesel::query_builder::{AstPass, Query, QueryFragment, QueryId};
 use diesel::query_dsl::LoadQuery;
 use diesel::sql_types::BigInt;
+use diesel_async::AsyncConnection;
+use futures_util::TryStreamExt;
 use http::header;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -256,6 +258,26 @@ impl<T> PaginatedQuery<T> {
     {
         let options = self.options.clone();
         let records_and_total = self.internal_load(conn)?.collect::<QueryResult<_>>()?;
+        Ok(Paginated {
+            records_and_total,
+            options,
+        })
+    }
+
+    /// Asynchronously load the records and total count.
+    ///
+    /// Note that this function apparently needs to be used with
+    /// `.boxed().await` at the moment to compile without errors.
+    pub async fn async_load<'a, U, Conn>(self, conn: &mut Conn) -> QueryResult<Paginated<U>>
+    where
+        Self: diesel_async::methods::LoadQuery<'a, Conn, WithCount<U>>,
+        Conn: AsyncConnection,
+    {
+        use diesel_async::methods::LoadQuery;
+
+        let options = self.options.clone();
+        let records_and_total = self.internal_load(conn).await?.try_collect().await?;
+
         Ok(Paginated {
             records_and_total,
             options,

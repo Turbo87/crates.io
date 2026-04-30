@@ -68,15 +68,11 @@ export const test = base.extend<AppOptions & AppFixtures>({
       };
 
       await use({ worker, db, authenticateAs });
-
-      // Close pages before disabling MSW. Otherwise any request still in
-      // flight (or fired by late-running hydration code) bypasses the
-      // mocks once `worker.disable()` removes the interception, and hits
-      // the real network instead.
-      await Promise.all(context.pages().map(p => p.close()));
-
       await db.reset();
-      await worker.disable();
+      // Intentionally not calling `worker.disable()`. It sends
+      // `Fetch.disable` to the still-alive page, opening a window where
+      // late hydration requests bypass the mocks and hit the real
+      // network. The route is cleaned up when the context is torn down.
     },
     { auto: true, scope: 'test' },
   ],

@@ -19,3 +19,12 @@ define_sql_function! {
     /// Rebuilds the `reverse_dependencies` rows for the given dependent crate ids.
     fn rebuild_reverse_dependencies(dependent_crate_ids: Array<Integer>);
 }
+define_sql_function! {
+    /// Returns the version id that should be the crate's default version, or NULL
+    /// if it has no versions.
+    fn compute_default_version(crate_id: Integer) -> Nullable<Integer>;
+}
+define_sql_function! {
+    /// Rebuilds the `default_versions` row for the given crate id.
+    fn rebuild_default_version(crate_id: Integer);
+}

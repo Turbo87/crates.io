@@ -1,6 +1,5 @@
 use crate::dialoguer;
 use anyhow::Context;
-use crates_io::models::update_default_version;
 use crates_io::schema::crates;
 use crates_io::storage::Storage;
 use crates_io::worker::jobs;
@@ -83,10 +82,9 @@ pub async fn run(opts: Opts) -> anyhow::Result<()> {
             }
         }
 
-        info!(%crate_name, %crate_id, "Updating default version in the database");
-        if let Err(error) = update_default_version(crate_id, conn).await {
-            warn!(%crate_name, %crate_id, "Failed to update default version: {error}");
-        }
+        // The default version is recomputed automatically by the database trigger
+        // on the `versions` delete above (in the same transaction, so the deferred
+        // `default_versions` foreign key check passes at commit).
 
         Ok::<_, anyhow::Error>(opts)
     }).await?;

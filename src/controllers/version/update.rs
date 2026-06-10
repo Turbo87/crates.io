@@ -8,7 +8,7 @@ use crate::rate_limiter::LimitedAction;
 use crate::schema::versions;
 use crate::util::errors::{AppResult, bad_request, custom};
 use crate::views::EncodableVersion;
-use crate::worker::jobs::{SyncToGitIndex, SyncToSparseIndex, UpdateDefaultVersion};
+use crate::worker::jobs::{GenerateOgImage, SyncToGitIndex, SyncToSparseIndex};
 use axum::Json;
 use crates_io_worker::BackgroundJob;
 use diesel::prelude::*;
@@ -179,14 +179,17 @@ pub async fn perform_version_yank_update(
         .insert(conn)
         .await?;
 
+    // The default version is recomputed automatically by the database trigger on
+    // the `versions.yanked` update above, so we only need to regenerate the
+    // OpenGraph image (which displays the default version) and sync the index.
     let git_index_job = SyncToGitIndex::new(&krate.name);
     let sparse_index_job = SyncToSparseIndex::new(&krate.name);
-    let update_default_version_job = UpdateDefaultVersion::new(krate.id);
+    let og_image_job = GenerateOgImage::new(krate.name.clone());
 
     tokio::try_join!(
         git_index_job.enqueue(&*conn),
         sparse_index_job.enqueue(&*conn),
-        update_default_version_job.enqueue(&*conn),
+        og_image_job.enqueue(&*conn),
     )?;
 
     Ok(())

@@ -2,7 +2,7 @@ use crate::dialoguer;
 use crates_io::db;
 use crates_io::models::{Crate, Version};
 use crates_io::schema::versions;
-use crates_io::worker::jobs::{SyncToGitIndex, SyncToSparseIndex, UpdateDefaultVersion};
+use crates_io::worker::jobs::{GenerateOgImage, SyncToGitIndex, SyncToSparseIndex};
 use crates_io_worker::BackgroundJob;
 use diesel::prelude::*;
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl};
@@ -66,14 +66,17 @@ async fn yank(opts: Opts, conn: &mut AsyncPgConnection) -> anyhow::Result<()> {
         .execute(conn)
         .await?;
 
+    // The default version is recomputed automatically by the database trigger on
+    // the `versions.yanked` update above; we only need to regenerate the
+    // OpenGraph image and sync the index.
     let git_index_job = SyncToGitIndex::new(&krate.name);
     let sparse_index_job = SyncToSparseIndex::new(&krate.name);
-    let update_default_version_job = UpdateDefaultVersion::new(krate.id);
+    let og_image_job = GenerateOgImage::new(krate.name.clone());
 
     tokio::try_join!(
         git_index_job.enqueue(&*conn),
         sparse_index_job.enqueue(&*conn),
-        update_default_version_job.enqueue(&*conn),
+        og_image_job.enqueue(&*conn),
     )?;
 
     Ok(())

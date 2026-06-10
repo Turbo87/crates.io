@@ -4,7 +4,6 @@ use crate::app::AppState;
 use crate::auth::{AuthCheck, AuthHeader, Authentication};
 use crate::worker::jobs::{
     self, AnalyzeCrateFile, CheckTyposquat, GenerateOgImage, SendPublishNotificationsJob,
-    UpdateDefaultVersion,
 };
 use axum::Json;
 use axum::body::{Body, Bytes};
@@ -33,7 +32,7 @@ use url::Url;
 
 use crate::models::{
     Category, Crate, DependencyKind, Keyword, NewCrate, NewVersion, NewVersionOwnerAction,
-    VersionAction, default_versions::Version as DefaultVersion,
+    VersionAction,
 };
 
 use crate::controllers::helpers::authorization::Rights;
@@ -561,45 +560,19 @@ pub async fn publish(app: AppState, req: Parts, body: Body) -> AppResult<Json<Go
         // Link this new version to all dependencies
         add_dependencies(conn, &deps, version.id).await?;
 
-        let existing_default_version = default_versions::table
+        // The `default_versions` row is maintained by triggers on the `versions`
+        // table, so after inserting the new version above it already reflects the
+        // (possibly unchanged) default version and version count for this crate.
+        let default_version_info = default_versions::table
             .inner_join(versions::table)
             .filter(default_versions::crate_id.eq(krate.id))
-            .select((DefaultVersion::as_select(), default_versions::num_versions))
-            .first::<(DefaultVersion, Option<i32>)>(conn)
+            .select((versions::num, default_versions::num_versions))
+            .first::<(String, Option<i32>)>(conn)
             .await
             .optional()?;
 
-        let num_versions = existing_default_version.as_ref().and_then(|t| t.1).unwrap_or_default();
-        let mut default_version = None;
-        // Upsert the `default_value` determined by the existing `default_value` and the
-        // published version. Note that this could potentially write an outdated version
-        // (although this should not happen regularly), as we might be comparing to an
-        // outdated value. The initial record will be handled by the trigger function.
-        //
-        // Compared to only using a background job, this prevents us from getting into a
-        // situation where a crate exists in the `crates` table but doesn't have a default
-        // version in the `default_versions` table.
-        if let Some((existing_default_version, _)) = &existing_default_version {
-            let published_default_version = DefaultVersion {
-                id: version.id,
-                num: semver,
-                yanked: false,
-            };
-
-            if existing_default_version < &published_default_version {
-                diesel::update(default_versions::table)
-                    .filter(default_versions::crate_id.eq(krate.id))
-                    .set(default_versions::version_id.eq(version.id))
-                    .execute(conn)
-                    .await?;
-            } else {
-                default_version = Some(existing_default_version.num.to_string());
-            }
-
-            // Update the default version asynchronously in a background job
-            // to ensure correctness and eventual consistency.
-            UpdateDefaultVersion::new(krate.id).enqueue(conn).await?;
-        }
+        let num_versions = default_version_info.as_ref().and_then(|t| t.1).unwrap_or_default();
+        let default_version = default_version_info.map(|t| t.0);
 
         // Update all keywords for this crate
         Keyword::update_crate(conn, krate.id, &keywords).await?;
@@ -655,13 +628,13 @@ pub async fn publish(app: AppState, req: Parts, body: Body) -> AppResult<Json<Go
             enqueue_or_log(&analyze_crate_file_job, &*conn),
         )?;
 
-        // Enqueue OG image generation job if not handled by UpdateDefaultVersion
-        if existing_default_version.is_none() {
-            let og_image_job = GenerateOgImage::new(krate.name.clone());
-            if let Err(error) = og_image_job.enqueue(&*conn).await {
-                error!("Failed to enqueue `GenerateOgImage` job: {error}");
-            }
-        };
+        // Regenerate the crate's OpenGraph image. The default version it displays
+        // is maintained by database triggers, so this is enqueued unconditionally
+        // here rather than from the former `UpdateDefaultVersion` background job.
+        let og_image_job = GenerateOgImage::new(krate.name.clone());
+        if let Err(error) = og_image_job.enqueue(&*conn).await {
+            error!("Failed to enqueue `GenerateOgImage` job: {error}");
+        }
 
         // Experiment: check new crates for potential typosquatting.
         if existing_crate.is_none() {

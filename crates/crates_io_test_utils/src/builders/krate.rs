@@ -1,4 +1,4 @@
-use crates_io_database::models::{Category, Crate, Keyword, NewCrate, update_default_version};
+use crates_io_database::models::{Category, Crate, Keyword, NewCrate};
 use crates_io_database::schema::{crate_downloads, crates, version_downloads};
 
 use super::VersionBuilder;
@@ -187,7 +187,8 @@ impl<'a> CrateBuilder<'a> {
                 .await?;
         }
 
-        update_default_version(krate.id, connection).await?;
+        // The `default_versions` row is maintained automatically by database
+        // triggers as the versions above are inserted.
 
         Ok(krate)
     }

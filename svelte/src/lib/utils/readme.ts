@@ -27,8 +27,8 @@ export function readmeUrl(crateName: string, versionNum: string): string {
 
   // The backend percent-encodes `+` (which can appear in semver build metadata)
   // when uploading, so mirror that here to match the stored object key.
-  let path = `readmes/${crateName}/${crateName}-${versionNum}.html`.replaceAll('+', '%2B');
-  return `${base}/${path}`;
+  let version = versionNum.replaceAll('+', '%2B');
+  return `${base}/readmes/${crateName}/${crateName}-${version}.html`;
 }
 
 /**

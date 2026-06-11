@@ -1,5 +1,5 @@
 [package]
-name = "cargo-manifest"
+name = "crates_io_cargo_toml"
 version = "0.0.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rust-lang/crates.io"
@@ -7,7 +7,7 @@ description = "Helper crate to parse and manipulate manifests - `Cargo.toml` fil
 edition = "2021"
 
 [lib]
-name = "cargo_manifest"
+name = "crates_io_cargo_toml"
 path = "src/lib.rs"
 
 [lints]

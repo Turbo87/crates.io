@@ -1,8 +1,14 @@
-cargo-manifest
+crates_io_cargo_toml
 ==============================================================================
 
 [`serde`](https://serde.rs) definitions to read and write
 [`Cargo.toml`](https://doc.rust-lang.org/cargo/reference/manifest.html) files.
+
+> [!NOTE]
+> This crate is a vendored copy of the
+> [`cargo-manifest`](https://github.com/LukeMathWalker/cargo-manifest) crate,
+> imported into the crates.io workspace (including its git history) and renamed
+> to `crates_io_cargo_toml`.
 
 
 Description
@@ -25,24 +31,14 @@ binaries.
 > `Cargo.toml` files.
 
 
-Installation
-------------------------------------------------------------------------------
-
-```sh
-cargo add cargo-manifest
-```
-
-
 Usage
 ------------------------------------------------------------------------------
 
 ```rust
-use cargo_manifest::Manifest;
+use crates_io_cargo_toml::Manifest;
 
 let manifest = Manifest::from_path("Cargo.toml").unwrap();
 ```
-
-see [docs.rs](https://docs.rs/cargo-manifest) for more information.
 
 
 Users

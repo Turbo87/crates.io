@@ -8,7 +8,7 @@ use crate::worker::jobs::{
 };
 use axum::Json;
 use axum::body::{Body, Bytes};
-use cargo_manifest::{Dependency, DepsSet, TargetDepsSet};
+use crates_io_cargo_toml::{Dependency, DepsSet, TargetDepsSet};
 use chrono::{DateTime, SecondsFormat, Utc};
 use crates_io_tarball::{TarballError, process_tarball};
 use crates_io_validation::{

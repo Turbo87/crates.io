@@ -22,3 +22,4 @@ utoipa = { version = "=5.5.0", features = ["chrono"] }
 
 [dev-dependencies]
 claims = "=0.8.0"
+hegeltest = "=0.23.1"

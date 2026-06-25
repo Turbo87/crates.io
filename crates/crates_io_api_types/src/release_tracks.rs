@@ -175,3 +175,68 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::{ReleaseTrackName, ReleaseTracks};
+    use hegel::TestCase;
+    use hegel::generators as gs;
+    use semver::Version;
+    use std::collections::BTreeSet;
+
+    /// Independent computation of a version's release track.
+    fn track_of(version: &Version) -> ReleaseTrackName {
+        if version.major == 0 {
+            ReleaseTrackName::Minor(version.minor)
+        } else {
+            ReleaseTrackName::Major(version.major)
+        }
+    }
+
+    /// Small major/minor/patch ranges so that many versions share a track, with
+    /// occasional prereleases (which must be ignored).
+    fn version() -> impl hegel::Generator<Version> {
+        hegel::compose!(|tc| {
+            let major = tc.draw(gs::integers::<u64>().min_value(0).max_value(3));
+            let minor = tc.draw(gs::integers::<u64>().min_value(0).max_value(3));
+            let patch = tc.draw(gs::integers::<u64>().min_value(0).max_value(5));
+            let mut s = format!("{major}.{minor}.{patch}");
+            if tc.draw(gs::booleans()) {
+                s.push_str(&tc.draw(gs::sampled_from(vec!["-alpha", "-rc.1", "-beta.2"])));
+            }
+            Version::parse(&s).unwrap()
+        })
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_release_tracks(tc: TestCase) {
+        let mut versions = tc.draw(gs::vecs(version()).max_size(15));
+        // The function documents that input must be sorted descending.
+        versions.sort_by(|a, b| b.cmp(a));
+
+        let result = ReleaseTracks::from_sorted_semver_iter(versions.iter());
+        let map = &result.0;
+
+        // The set of tracks equals the tracks of all non-prerelease versions.
+        let expected: BTreeSet<ReleaseTrackName> = versions
+            .iter()
+            .filter(|v| v.pre.is_empty())
+            .map(track_of)
+            .collect();
+        assert_eq!(map.len(), expected.len());
+
+        for (key, details) in map.iter() {
+            assert!(expected.contains(key), "unexpected track {key:?}");
+            // The representative is a non-prerelease version of this exact track,
+            assert!(details.highest.pre.is_empty(), "highest is a prerelease");
+            assert_eq!(track_of(&details.highest), *key);
+            // and it is the maximum such version present in the input.
+            let max = versions
+                .iter()
+                .filter(|v| v.pre.is_empty() && track_of(v) == *key)
+                .max()
+                .unwrap();
+            assert_eq!(&details.highest, max, "highest is not the maximum of its track");
+        }
+    }
+}

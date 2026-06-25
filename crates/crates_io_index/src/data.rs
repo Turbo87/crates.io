@@ -112,3 +112,92 @@ pub enum DependencyKind {
     Build,
     Dev,
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::{Dependency, DependencyKind};
+    use hegel::TestCase;
+    use hegel::generators as gs;
+    use std::cmp::Ordering;
+
+    /// Draws a `Dependency` from small per-field pools so that distinct draws
+    /// frequently tie on some fields — which is what actually exercises the
+    /// tie-breaking ordering and the total-order axioms.
+    fn dependency() -> impl hegel::Generator<Dependency> {
+        hegel::compose!(|tc| {
+            let strings = |pool: Vec<&str>| {
+                pool.into_iter().map(String::from).collect::<Vec<_>>()
+            };
+            Dependency {
+                name: tc.draw(gs::sampled_from(strings(vec!["a", "b", "c"]))),
+                req: tc.draw(gs::sampled_from(strings(vec!["^1.0", "=2.0", "*"]))),
+                features: tc.draw(
+                    gs::vecs(gs::sampled_from(strings(vec!["x", "y"]))).max_size(2),
+                ),
+                optional: tc.draw(gs::booleans()),
+                default_features: tc.draw(gs::booleans()),
+                target: tc.draw(gs::sampled_from(vec![
+                    None,
+                    Some("cfg(unix)".to_string()),
+                    Some("wasm".to_string()),
+                ])),
+                kind: tc.draw(gs::sampled_from(vec![
+                    None,
+                    Some(DependencyKind::Normal),
+                    Some(DependencyKind::Build),
+                    Some(DependencyKind::Dev),
+                ])),
+                package: tc.draw(gs::sampled_from(vec![
+                    None,
+                    Some("p".to_string()),
+                    Some("q".to_string()),
+                ])),
+            }
+        })
+    }
+
+    #[hegel::test(test_cases = 1000)]
+    fn prop_reflexive(tc: TestCase) {
+        let a = tc.draw(dependency());
+        assert_eq!(a.cmp(&a), Ordering::Equal);
+        assert_eq!(a.partial_cmp(&a), Some(Ordering::Equal));
+        assert_eq!(a, a);
+    }
+
+    #[hegel::test(test_cases = 3000)]
+    fn prop_antisymmetric_and_consistent_with_eq(tc: TestCase) {
+        let a = tc.draw(dependency());
+        let b = tc.draw(dependency());
+
+        // partial_cmp agrees with cmp.
+        assert_eq!(a.partial_cmp(&b), Some(a.cmp(&b)));
+        // Reversing the operands reverses the ordering.
+        assert_eq!(b.cmp(&a), a.cmp(&b).reverse());
+        // cmp reports Equal exactly when the values are equal.
+        assert_eq!(a.cmp(&b) == Ordering::Equal, a == b);
+    }
+
+    #[hegel::test(test_cases = 4000)]
+    fn prop_transitive(tc: TestCase) {
+        let a = tc.draw(dependency());
+        let b = tc.draw(dependency());
+        let c = tc.draw(dependency());
+
+        let (ab, bc, ac) = (a.cmp(&b), b.cmp(&c), a.cmp(&c));
+        if ab != Ordering::Greater && bc != Ordering::Greater {
+            assert_ne!(ac, Ordering::Greater, "a<=b, b<=c but a>c");
+        }
+        if ab != Ordering::Less && bc != Ordering::Less {
+            assert_ne!(ac, Ordering::Less, "a>=b, b>=c but a<c");
+        }
+    }
+
+    #[hegel::test(test_cases = 1000)]
+    fn prop_sort_yields_ordered_sequence(tc: TestCase) {
+        let mut deps = tc.draw(gs::vecs(dependency()).max_size(12));
+        deps.sort_by(|a, b| a.cmp(b));
+        for pair in deps.windows(2) {
+            assert_ne!(pair[0].cmp(&pair[1]), Ordering::Greater, "sort left a > b adjacent");
+        }
+    }
+}

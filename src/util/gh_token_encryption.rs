@@ -175,3 +175,63 @@ mod tests {
         assert_eq!(decrypted.expose_secret(), token);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use hegel::TestCase;
+    use hegel::generators as gs;
+    use secrecy::ExposeSecret;
+
+    fn encryption() -> GitHubTokenEncryption {
+        GitHubTokenEncryption::for_testing()
+    }
+
+    /// Round-trip: any UTF-8 token survives encrypt followed by decrypt.
+    #[hegel::test(test_cases = 1000)]
+    fn prop_encrypt_decrypt_roundtrip(tc: TestCase) {
+        let plaintext = tc.draw(gs::text().max_size(256));
+        let enc = encryption();
+        let ciphertext = enc.encrypt(&plaintext).unwrap();
+        let decrypted = enc.decrypt(&ciphertext).unwrap();
+        assert_eq!(decrypted.expose_secret(), plaintext.as_str());
+    }
+
+    /// The random nonce makes each encryption unique, yet both decrypt back to
+    /// the same plaintext.
+    #[hegel::test(test_cases = 500)]
+    fn prop_ciphertext_is_randomized(tc: TestCase) {
+        let plaintext = tc.draw(gs::text().max_size(64));
+        let enc = encryption();
+        let a = enc.encrypt(&plaintext).unwrap();
+        let b = enc.encrypt(&plaintext).unwrap();
+        assert_ne!(a, b, "nonce reuse produced identical ciphertext");
+        assert_eq!(enc.decrypt(&a).unwrap().expose_secret(), plaintext.as_str());
+        assert_eq!(enc.decrypt(&b).unwrap().expose_secret(), plaintext.as_str());
+    }
+
+    /// Flipping any byte of a valid ciphertext (nonce or AEAD body) is rejected.
+    #[hegel::test(test_cases = 1000)]
+    fn prop_tampered_ciphertext_is_rejected(tc: TestCase) {
+        let plaintext = tc.draw(gs::text().max_size(128));
+        let enc = encryption();
+        let mut ciphertext = enc.encrypt(&plaintext).unwrap();
+        let idx = tc.draw(
+            gs::integers::<usize>()
+                .min_value(0)
+                .max_value(ciphertext.len() - 1),
+        );
+        ciphertext[idx] ^= 0xff;
+        assert!(
+            enc.decrypt(&ciphertext).is_err(),
+            "tampered ciphertext was accepted (flipped byte {idx})"
+        );
+    }
+
+    /// Decryption of arbitrary bytes returns a Result and never panics.
+    #[hegel::test(test_cases = 1000)]
+    fn prop_decrypt_arbitrary_bytes_never_panics(tc: TestCase) {
+        let bytes = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(64));
+        let _ = encryption().decrypt(&bytes);
+    }
+}

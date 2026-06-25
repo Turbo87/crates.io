@@ -1688,6 +1688,7 @@ dependencies = [
  "futures-util",
  "git2",
  "googletest",
+ "hegeltest",
  "hex",
  "http 1.4.2",
  "hyper",

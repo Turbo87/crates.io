@@ -739,3 +739,192 @@ world!
         "#);
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use hegel::generators as gs;
+    use hegel::{Generator, TestCase};
+
+    /// Elements that must never survive sanitization. Because the renderer always
+    /// escapes a stray `<` in user text to `&lt;`, a literal `<tag` token in the
+    /// output can only be a real element emitted past the sanitizer — so finding
+    /// one here is a genuine safety failure, not a false positive on text content.
+    const FORBIDDEN_TAGS: &[&str] = &[
+        "script", "iframe", "object", "embed", "form", "style", "meta", "link", "base", "svg",
+        "math", "frame", "frameset", "applet", "noscript", "template",
+    ];
+
+    /// Asserts the rendered HTML contains no dangerous element, no event-handler
+    /// (`on*`) attribute, and no `javascript:`/`vbscript:`/`data:` URL in an
+    /// attribute value. Attributes are parsed with quote-awareness so that URL
+    /// query strings like `?onload=1` inside a value never trip the check.
+    #[track_caller]
+    fn assert_safe(html: &str) {
+        let lower = html.to_ascii_lowercase();
+        let bytes = lower.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] != b'<' {
+                i += 1;
+                continue;
+            }
+            let mut j = i + 1;
+            let closing = j < bytes.len() && bytes[j] == b'/';
+            if closing {
+                j += 1;
+            }
+            let name_start = j;
+            while j < bytes.len() && bytes[j].is_ascii_alphanumeric() {
+                j += 1;
+            }
+            let name = &lower[name_start..j];
+            assert!(
+                !FORBIDDEN_TAGS.contains(&name),
+                "forbidden <{name}> element in sanitized output: {html:?}"
+            );
+            if closing || name.is_empty() {
+                i = j.max(i + 1);
+                continue;
+            }
+            // Parse the attribute list up to the closing `>`, honoring quotes.
+            let mut k = j;
+            while k < bytes.len() && bytes[k] != b'>' {
+                while k < bytes.len() && bytes[k].is_ascii_whitespace() {
+                    k += 1;
+                }
+                if k >= bytes.len() || bytes[k] == b'>' {
+                    break;
+                }
+                let an_start = k;
+                while k < bytes.len()
+                    && !bytes[k].is_ascii_whitespace()
+                    && bytes[k] != b'='
+                    && bytes[k] != b'>'
+                {
+                    k += 1;
+                }
+                let aname = &lower[an_start..k];
+                assert!(
+                    !aname.starts_with("on"),
+                    "event-handler attribute `{aname}` in sanitized output: {html:?}"
+                );
+                while k < bytes.len() && bytes[k].is_ascii_whitespace() {
+                    k += 1;
+                }
+                if k < bytes.len() && bytes[k] == b'=' {
+                    k += 1;
+                    while k < bytes.len() && bytes[k].is_ascii_whitespace() {
+                        k += 1;
+                    }
+                    let value = if k < bytes.len() && (bytes[k] == b'"' || bytes[k] == b'\'') {
+                        let quote = bytes[k];
+                        k += 1;
+                        let v_start = k;
+                        while k < bytes.len() && bytes[k] != quote {
+                            k += 1;
+                        }
+                        let v = &lower[v_start..k];
+                        if k < bytes.len() {
+                            k += 1;
+                        }
+                        v
+                    } else {
+                        let v_start = k;
+                        while k < bytes.len()
+                            && !bytes[k].is_ascii_whitespace()
+                            && bytes[k] != b'>'
+                        {
+                            k += 1;
+                        }
+                        &lower[v_start..k]
+                    };
+                    let scheme: String = value.chars().filter(|c| !c.is_whitespace()).collect();
+                    for bad in ["javascript:", "vbscript:"] {
+                        assert!(
+                            !scheme.starts_with(bad),
+                            "dangerous `{bad}` URL in `{aname}`: {html:?}"
+                        );
+                    }
+                }
+            }
+            i = k.max(i + 1);
+        }
+    }
+
+    /// Adversarial fragments combined with arbitrary text. Each fragment is a
+    /// known XSS vector; interleaving them with random text and markdown exercises
+    /// the renderer's escaping and the sanitizer together.
+    fn fragment() -> impl Generator<String> {
+        let payloads: Vec<String> = [
+            "<script>alert(1)</script>",
+            "<SCRIPT >alert(1)</SCRIPT>",
+            "<img src=x onerror=alert(1)>",
+            "<img src=\"x\" onerror=\"alert(1)\">",
+            "<iframe src=\"https://evil.example\"></iframe>",
+            "<a href=\"javascript:alert(1)\">x</a>",
+            "<a href=\"  javascript:alert(1)\">x</a>",
+            "[click](javascript:alert(1))",
+            "![img](javascript:alert(1))",
+            "<svg/onload=alert(1)>",
+            "<svg><script>alert(1)</script></svg>",
+            "<object data=\"x\"></object>",
+            "<embed src=\"x\">",
+            "<style>body{color:red}</style>",
+            "<a href=\"vbscript:msgbox(1)\">x</a>",
+            "<math><mtext></mtext></math>",
+            "<!-- <script>alert(1)</script> -->",
+            "<form action=\"x\"><input></form>",
+            "<base href=\"https://evil.example/\">",
+            "<a href=\"https://ok.example/?onload=1&x=2\">safe query</a>",
+            "`inline <script> code`",
+            "normal **markdown** _text_ with [a link](https://ok.example)\n\n# Heading\n",
+            "> quote\n\n- a\n- b\n\n| h |\n|---|\n| c |\n",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        gs::one_of([
+            gs::sampled_from(payloads).boxed(),
+            gs::text().max_size(48).boxed(),
+        ])
+    }
+
+    fn base_url() -> impl Generator<Option<String>> {
+        gs::sampled_from(vec![
+            None,
+            Some("https://github.com/foo/bar".to_string()),
+            Some("https://gitlab.com/foo/bar.git".to_string()),
+            Some("https://evil.example/foo/bar".to_string()),
+        ])
+    }
+
+    #[hegel::test(test_cases = 1500)]
+    fn prop_output_never_contains_unsafe_html(tc: TestCase) {
+        let parts = tc.draw(gs::vecs(fragment()).min_size(1).max_size(12));
+        let text = parts.join("\n\n");
+        let base = tc.draw(base_url());
+        let filename = tc.draw(gs::sampled_from(vec![
+            "README.md",
+            "README",
+            "readme.txt",
+            "notes.markdown",
+            "src/main.rs",
+        ]));
+
+        let html = text_to_html(&text, filename, base.as_deref(), None);
+        assert_safe(&html);
+    }
+
+    /// Rendering is deterministic: identical inputs always produce identical output.
+    #[hegel::test]
+    fn prop_render_is_deterministic(tc: TestCase) {
+        let parts = tc.draw(gs::vecs(fragment()).min_size(0).max_size(6));
+        let text = parts.join("\n");
+        let base = tc.draw(base_url());
+        let a = text_to_html(&text, "README.md", base.as_deref(), None);
+        let b = text_to_html(&text, "README.md", base.as_deref(), None);
+        assert_eq!(a, b);
+    }
+}

@@ -358,3 +358,129 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use hegel::generators as gs;
+    use hegel::{Generator, TestCase};
+    use unicode_xid::UnicodeXID;
+
+    const LETTERS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    /// Characters allowed in the tail of a crate/dependency name.
+    const NAME_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+
+    // Independent reference reimplementations of the accept/reject rules. The
+    // properties below assert that the real validators agree with these on
+    // arbitrary input, which both pins down the documented behaviour and proves
+    // the validators never panic (they run on every drawn string).
+
+    fn ref_crate_name(name: &str) -> bool {
+        if name.is_empty() || name.chars().count() > MAX_NAME_LENGTH {
+            return false;
+        }
+        let mut chars = name.chars();
+        let first = chars.next().unwrap();
+        first.is_ascii_alphabetic() && chars.all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    }
+
+    fn ref_dependency_name(name: &str) -> bool {
+        if name.is_empty() || name.chars().count() > MAX_NAME_LENGTH {
+            return false;
+        }
+        let mut chars = name.chars();
+        let first = chars.next().unwrap();
+        (first.is_ascii_alphabetic() || first == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    }
+
+    fn ref_feature_name(name: &str) -> bool {
+        if name.is_empty() {
+            return false;
+        }
+        let mut chars = name.chars();
+        let first = chars.next().unwrap();
+        (UnicodeXID::is_xid_start(first) || first == '_' || first.is_ascii_digit())
+            && chars.all(|c| UnicodeXID::is_xid_continue(c) || c == '+' || c == '-' || c == '.')
+    }
+
+    fn ref_feature(name: &str) -> bool {
+        if let Some((dep, dep_feat)) = name.split_once('/') {
+            let dep = dep.strip_suffix('?').unwrap_or(dep);
+            ref_dependency_name(dep) && ref_feature_name(dep_feat)
+        } else if let Some((_, dep)) = name.split_once("dep:") {
+            ref_dependency_name(dep)
+        } else {
+            ref_feature_name(name)
+        }
+    }
+
+    /// A mix of arbitrary Unicode and a focused alphabet that frequently lands on
+    /// the boundaries that matter (separators, the 64-char length limit, and the
+    /// `dep:` / `?/` feature syntax). Drawing from both gives the no-panic /
+    /// reference-agreement checks broad and targeted coverage at once.
+    fn fuzz_names() -> impl Generator<String> {
+        const FUZZ_ALPHABET: &str = "abAB01-_+./?: 京💝\t";
+        gs::one_of([
+            gs::text().max_size(70).boxed(),
+            gs::text().alphabet(FUZZ_ALPHABET).max_size(70).boxed(),
+        ])
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_crate_name_matches_reference(tc: TestCase) {
+        let name = tc.draw(fuzz_names());
+        assert_eq!(
+            validate_crate_name("crate", &name).is_ok(),
+            ref_crate_name(&name),
+            "name = {name:?}"
+        );
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_dependency_name_matches_reference(tc: TestCase) {
+        let name = tc.draw(fuzz_names());
+        assert_eq!(
+            validate_dependency_name(&name).is_ok(),
+            ref_dependency_name(&name),
+            "name = {name:?}"
+        );
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_feature_name_matches_reference(tc: TestCase) {
+        let name = tc.draw(fuzz_names());
+        assert_eq!(
+            validate_feature_name(&name).is_ok(),
+            ref_feature_name(&name),
+            "name = {name:?}"
+        );
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_feature_matches_reference(tc: TestCase) {
+        let name = tc.draw(fuzz_names());
+        assert_eq!(
+            validate_feature(&name).is_ok(),
+            ref_feature(&name),
+            "name = {name:?}"
+        );
+    }
+
+    #[hegel::test]
+    fn prop_crate_name_accepts_constructed_valid(tc: TestCase) {
+        let first = tc.draw(gs::text().alphabet(LETTERS).min_size(1).max_size(1));
+        let rest = tc.draw(gs::text().alphabet(NAME_CHARS).max_size(MAX_NAME_LENGTH - 1));
+        let name = format!("{first}{rest}");
+        assert!(validate_crate_name("crate", &name).is_ok(), "name = {name:?}");
+    }
+
+    #[hegel::test]
+    fn prop_dependency_name_accepts_constructed_valid(tc: TestCase) {
+        // Dependency names additionally allow a leading underscore.
+        let first = tc.draw(gs::text().alphabet(concat!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", "_")).min_size(1).max_size(1));
+        let rest = tc.draw(gs::text().alphabet(NAME_CHARS).max_size(MAX_NAME_LENGTH - 1));
+        let name = format!("{first}{rest}");
+        assert!(validate_dependency_name(&name).is_ok(), "name = {name:?}");
+    }
+}

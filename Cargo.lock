@@ -2124,6 +2124,7 @@ dependencies = [
  "claims",
  "clap",
  "crates_io_version",
+ "hegeltest",
  "insta",
  "jsonwebtoken",
  "mockall",

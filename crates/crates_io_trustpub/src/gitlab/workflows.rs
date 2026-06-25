@@ -112,3 +112,89 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::extract_workflow_filepath;
+    use hegel::generators as gs;
+    use hegel::{Generator, TestCase};
+
+    /// Strings assembled from the tokens that drive the parser's branches
+    /// (`//`, `@`, extensions, slashes, NUL/newlines) interleaved with arbitrary
+    /// text. Any input that does not parse must still terminate and return None.
+    fn adversarial() -> impl Generator<String> {
+        let tokens: Vec<String> = [
+            "//", "@", ".yml", ".yaml", "/", ".", "a", "gitlab.com/foo/bar", "\0", "\n",
+            ".wrongsuffix", "refs/heads/main",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        hegel::compose!(|tc| {
+            let parts = tc.draw(gs::vecs(gs::sampled_from(tokens.clone())).max_size(20));
+            let mut s = parts.join("");
+            // Occasionally mix in fully arbitrary text too.
+            if tc.draw(gs::booleans()) {
+                s.push_str(&tc.draw(gs::text().max_size(16)));
+            }
+            s
+        })
+    }
+
+    #[hegel::test(test_cases = 3000)]
+    fn prop_never_panics_and_output_is_well_formed(tc: TestCase) {
+        let input = tc.draw(adversarial());
+        // The call must always terminate (ReDoS-safety) and never panic.
+        if let Some(filepath) = extract_workflow_filepath(&input) {
+            // Postconditions guaranteed by the parser for any accepted input.
+            assert!(
+                filepath.ends_with(".yml") || filepath.ends_with(".yaml"),
+                "accepted {filepath:?} without a yaml extension"
+            );
+            let basename = filepath.rsplit('/').next().unwrap();
+            assert!(
+                basename != ".yml" && basename != ".yaml",
+                "accepted bare-extension basename in {filepath:?}"
+            );
+            assert!(input.contains("//"), "accepted input without `//`: {input:?}");
+            assert!(
+                input.contains(filepath),
+                "result {filepath:?} is not a slice of the input"
+            );
+        }
+    }
+
+    /// Builds a syntactically valid `ci_config_ref_uri` and asserts the parser
+    /// extracts exactly the filepath that was embedded.
+    #[hegel::test(test_cases = 2000)]
+    fn prop_extracts_embedded_filepath(tc: TestCase) {
+        // Segment chars exclude `/` and `@` so the only separators are the ones
+        // we insert; includes `.` so multi-dot names are exercised.
+        const SEG: &str = "abcXYZ012-_.";
+
+        let result = tc.draw(hegel::compose!(|tc| {
+            let n_dirs = tc.draw(gs::integers::<usize>().min_value(0).max_value(3));
+            let mut segments = Vec::new();
+            for _ in 0..n_dirs {
+                segments.push(tc.draw(gs::text().alphabet(SEG).min_size(1).max_size(6)));
+            }
+            let stem = tc.draw(gs::text().alphabet(SEG).min_size(1).max_size(6));
+            let ext = tc.draw(gs::sampled_from(vec![".yml", ".yaml"]));
+            segments.push(format!("{stem}{ext}"));
+            let filepath = segments.join("/");
+
+            // The ref part must contain no `@` so the last `@` is our separator.
+            let git_ref = tc.draw(gs::text().alphabet("abc/0123-_ ").max_size(12));
+            let input = format!("gitlab.com/foo/bar//{filepath}@{git_ref}");
+            (input, filepath)
+        }));
+
+        let (input, expected) = result;
+        assert_eq!(
+            extract_workflow_filepath(&input),
+            Some(expected.as_str()),
+            "input = {input:?}"
+        );
+    }
+}

@@ -8,6 +8,9 @@ pub mod keystore;
 pub mod test_keys;
 pub mod unverified;
 
+#[cfg(test)]
+mod validation_proptests;
+
 /// Leeway applied to JWT `exp`, `nbf`, and `iat` validation to account for
 /// clock skew between the OIDC issuer and crates.io.
 ///

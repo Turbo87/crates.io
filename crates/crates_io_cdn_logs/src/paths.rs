@@ -141,3 +141,102 @@ mod tests {
         assert_none!(parse_path("/crates/foo/foo-1.2.3§foo.crate"));
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::parse_path;
+    use hegel::TestCase;
+    use hegel::generators as gs;
+    use semver::Version;
+
+    /// A valid crate name: non-empty, no `/` or `?`. Dashes/dots are allowed and
+    /// deliberately exercised because the `.crate` form embeds the name as a
+    /// prefix of the filename.
+    fn crate_name() -> impl hegel::Generator<String> {
+        gs::text()
+            .alphabet("abcdefghijklmnopqrstuvwxyz0123456789-_.")
+            .min_size(1)
+            .max_size(12)
+    }
+
+    /// A valid semver version, sometimes with a prerelease and/or build metadata.
+    fn version() -> impl hegel::Generator<Version> {
+        hegel::compose!(|tc| {
+            let major = tc.draw(gs::integers::<u64>().min_value(0).max_value(999));
+            let minor = tc.draw(gs::integers::<u64>().min_value(0).max_value(999));
+            let patch = tc.draw(gs::integers::<u64>().min_value(0).max_value(999));
+            let mut s = format!("{major}.{minor}.{patch}");
+            if tc.draw(gs::booleans()) {
+                s.push('-');
+                s.push_str(&tc.draw(gs::sampled_from(vec![
+                    "alpha", "beta", "rc.1", "0.3", "x.7.z.92",
+                ])));
+            }
+            if tc.draw(gs::booleans()) {
+                s.push('+');
+                s.push_str(&tc.draw(gs::sampled_from(vec!["build", "build.5", "21AF26D3"])));
+            }
+            Version::parse(&s).unwrap()
+        })
+    }
+
+    fn host_prefix() -> impl hegel::Generator<String> {
+        gs::sampled_from(vec![
+            String::new(),
+            "https://static.crates.io".to_string(),
+            "https://example.com/cdn".to_string(),
+        ])
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_roundtrip_both_url_formats(tc: TestCase) {
+        let name = tc.draw(crate_name());
+        let ver = tc.draw(version());
+        let prefix = tc.draw(host_prefix());
+
+        let crate_url = format!("{prefix}/crates/{name}/{name}-{ver}.crate");
+        let download_url = format!("{prefix}/crates/{name}/{ver}/download");
+
+        assert_eq!(
+            parse_path(&crate_url),
+            Some((name.clone(), ver.clone())),
+            "crate url = {crate_url:?}"
+        );
+        assert_eq!(
+            parse_path(&download_url),
+            Some((name, ver)),
+            "download url = {download_url:?}"
+        );
+    }
+
+    #[hegel::test(test_cases = 1500)]
+    fn prop_query_params_are_ignored(tc: TestCase) {
+        let name = tc.draw(crate_name());
+        let ver = tc.draw(version());
+        let url = format!("/crates/{name}/{name}-{ver}.crate");
+        let query = tc.draw(gs::text().max_size(20));
+
+        assert_eq!(
+            parse_path(&url),
+            parse_path(&format!("{url}?{query}")),
+            "url = {url:?}, query = {query:?}"
+        );
+    }
+
+    /// Arbitrary and path-shaped input must never panic.
+    #[hegel::test(test_cases = 3000)]
+    fn prop_never_panics(tc: TestCase) {
+        let tokens: Vec<String> = ["/crates/", "/", "-", ".crate", "/download", "?", "1.2.3", "foo"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let input = tc.draw(hegel::compose!(|tc| {
+            if tc.draw(gs::booleans()) {
+                tc.draw(gs::vecs(gs::sampled_from(tokens.clone())).max_size(16)).join("")
+            } else {
+                tc.draw(gs::text().max_size(40))
+            }
+        }));
+        let _ = parse_path(&input);
+    }
+}

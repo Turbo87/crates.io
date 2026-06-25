@@ -9,3 +9,6 @@ publish = false
 [dependencies]
 http = "=1.4.2"
 ipnetwork = "=0.21.1"
+
+[dev-dependencies]
+hegeltest = "=0.23.1"

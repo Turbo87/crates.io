@@ -143,3 +143,113 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::{X_FORWARDED_FOR, is_cdn_ip, parse_xff_header, process_xff_headers};
+    use hegel::TestCase;
+    use hegel::generators as gs;
+    use http::{HeaderMap, HeaderValue};
+    use std::net::IpAddr;
+
+    /// Independent oracle for `process_xff_headers`: the last successfully parsed,
+    /// non-CDN IP across all headers in order, computed directly from std parsing.
+    fn expected(headers: &HeaderMap) -> Option<IpAddr> {
+        let mut last = None;
+        for value in headers.get_all(X_FORWARDED_FOR) {
+            for segment in value.as_bytes().split(|&b| b == b',') {
+                if let Ok(text) = std::str::from_utf8(segment) {
+                    if let Ok(ip) = text.trim().parse::<IpAddr>() {
+                        if !is_cdn_ip(&ip) {
+                            last = Some(ip);
+                        }
+                    }
+                }
+            }
+        }
+        last
+    }
+
+    /// Header value content built from a pool of real IPs (CDN and non-CDN),
+    /// junk, and assorted separators (including empties via `,,`). All chars are
+    /// printable so `HeaderValue::from_bytes` always succeeds.
+    fn xff_value() -> impl hegel::Generator<String> {
+        hegel::compose!(|tc| {
+            let pool: Vec<String> = [
+                "1.1.1.1",
+                "2.2.2.2",
+                "3.3.3.3",
+                "12.34.56.78",
+                "130.176.118.147", // CloudFront
+                "151.101.0.1",     // Fastly
+                "::1",
+                "2001:db8::1",
+                " 9.9.9.9 ",
+                "oh",
+                "hi",
+                "",
+                "127.0.0.1",
+                "255.255.255.256", // invalid
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect();
+
+            let segments = tc.draw(gs::vecs(gs::sampled_from(pool)).max_size(6));
+            let separator = tc.draw(gs::sampled_from(vec![",", ", ", " , ", ",,"]));
+            segments.join(separator)
+        })
+    }
+
+    fn header_map() -> impl hegel::Generator<HeaderMap> {
+        hegel::compose!(|tc| {
+            let values = tc.draw(gs::vecs(xff_value()).max_size(3));
+            let mut headers = HeaderMap::new();
+            for value in &values {
+                if let Ok(header) = HeaderValue::from_bytes(value.as_bytes()) {
+                    headers.append(X_FORWARDED_FOR, header);
+                }
+            }
+            headers
+        })
+    }
+
+    #[hegel::test(test_cases = 3000)]
+    fn prop_process_xff_matches_oracle(tc: TestCase) {
+        let headers = tc.draw(header_map());
+        let result = process_xff_headers(&headers);
+        assert_eq!(result, expected(&headers));
+        // The chosen IP is never one of our CDN networks.
+        if let Some(ip) = result {
+            assert!(!is_cdn_ip(&ip), "returned a CDN IP: {ip}");
+        }
+    }
+
+    #[hegel::test(test_cases = 3000)]
+    fn prop_parse_xff_header_structure(tc: TestCase) {
+        let content = tc.draw(xff_value());
+        let header = HeaderValue::from_bytes(content.as_bytes()).unwrap();
+        let results = parse_xff_header(&header);
+
+        let bytes = header.as_bytes();
+        if bytes.is_empty() {
+            assert!(results.is_empty());
+            return;
+        }
+
+        // One result per comma-separated segment, in order.
+        let segments: Vec<&[u8]> = bytes.split(|&b| b == b',').collect();
+        assert_eq!(results.len(), segments.len());
+
+        for (result, segment) in results.iter().zip(segments) {
+            let parsed = std::str::from_utf8(segment).unwrap().trim().parse::<IpAddr>();
+            match result {
+                Ok(ip) => assert_eq!(parsed.unwrap(), *ip),
+                Err(raw) => {
+                    assert_eq!(*raw, segment, "Err must preserve the original bytes");
+                    assert!(parsed.is_err(), "segment {segment:?} parsed but was Err");
+                }
+            }
+        }
+    }
+}

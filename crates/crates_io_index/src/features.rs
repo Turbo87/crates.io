@@ -156,3 +156,87 @@ mod tests {
         assert_debug_snapshot!(split_features(features));
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use hegel::generators as gs;
+    use hegel::{Generator, TestCase};
+
+    /// Reference for the private `has_features2_syntax`.
+    fn has_syntax(s: &str) -> bool {
+        s.starts_with("dep:") || s.contains("?/")
+    }
+
+    /// Generates a small `FeaturesMap` over a tiny name pool so that values
+    /// frequently reference each other's keys (exercising the recursive
+    /// propagation), mixed with `dep:` and `?/` syntax tokens. The map is kept
+    /// small enough that the 100-iteration safety limit is never reached.
+    fn features_map() -> impl Generator<FeaturesMap> {
+        const NAMES: &[&str] = &["a", "b", "c", "d", "e", "f", "g", "h"];
+        hegel::compose!(|tc| {
+            let names: Vec<String> = NAMES.iter().map(|s| s.to_string()).collect();
+            let mut value_pool = names.clone();
+            for n in NAMES {
+                value_pool.push(format!("dep:{n}"));
+                value_pool.push(format!("{n}?/feat"));
+            }
+            value_pool.push("plainvalue".to_string());
+
+            let keys = tc.draw(gs::vecs(gs::sampled_from(names)).max_size(8));
+            let mut map = FeaturesMap::new();
+            for key in keys {
+                let vals = tc.draw(gs::vecs(gs::sampled_from(value_pool.clone())).max_size(5));
+                map.insert(key, vals);
+            }
+            map
+        })
+    }
+
+    #[hegel::test(test_cases = 2000)]
+    fn prop_split_features_is_correct_partition(tc: TestCase) {
+        let original = tc.draw(features_map());
+        let (features, features2) = split_features(original.clone());
+
+        // The two halves are disjoint and together reproduce the input exactly,
+        // values included (nothing is lost, duplicated, or mutated).
+        for key in features.keys() {
+            assert!(!features2.contains_key(key), "key {key:?} in both halves");
+        }
+        let mut combined = features.clone();
+        combined.extend(features2.clone());
+        assert_eq!(combined, original, "partition does not reproduce input");
+
+        // `features` entries are clean: no features2 syntax and no reference to a
+        // key that lives in `features2` (the closure property).
+        for (key, vals) in &features {
+            for val in vals {
+                assert!(!has_syntax(val), "feature {key:?} keeps syntax value {val:?}");
+                assert!(
+                    !features2.contains_key(val),
+                    "feature {key:?} references features2 key {val:?}"
+                );
+            }
+        }
+
+        // Every `features2` entry is justified: it either uses features2 syntax
+        // directly or depends on another features2 key.
+        for (key, vals) in &features2 {
+            let justified = vals
+                .iter()
+                .any(|val| has_syntax(val) || features2.contains_key(val));
+            assert!(justified, "features2 entry {key:?} is not justified: {vals:?}");
+        }
+    }
+
+    #[hegel::test(test_cases = 1000)]
+    fn prop_split_features_is_idempotent(tc: TestCase) {
+        let original = tc.draw(features_map());
+        let (features, features2) = split_features(original);
+
+        // Recombining and re-splitting reaches the same fixed point.
+        let mut combined = features.clone();
+        combined.extend(features2.clone());
+        assert_eq!(split_features(combined), (features, features2));
+    }
+}

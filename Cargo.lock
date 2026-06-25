@@ -1940,6 +1940,7 @@ dependencies = [
  "claims",
  "crates_io_env_vars",
  "git2",
+ "hegeltest",
  "insta",
  "secrecy",
  "serde",

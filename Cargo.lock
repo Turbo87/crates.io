@@ -1747,6 +1747,7 @@ dependencies = [
  "chrono",
  "claims",
  "crates_io_database",
+ "hegeltest",
  "indexmap",
  "semver",
  "sentry-core",
@@ -1778,6 +1779,7 @@ dependencies = [
  "clap",
  "criterion",
  "derive_more",
+ "hegeltest",
  "insta",
  "percent-encoding",
  "semver",
@@ -2008,6 +2010,7 @@ dependencies = [
 name = "crates_io_real_ip"
 version = "0.0.0"
 dependencies = [
+ "hegeltest",
  "http 1.4.2",
  "ipnetwork",
 ]

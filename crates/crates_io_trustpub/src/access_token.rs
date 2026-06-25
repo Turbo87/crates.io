@@ -165,3 +165,70 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::{AccessToken, checksum};
+    use hegel::TestCase;
+    use hegel::generators as gs;
+    use secrecy::ExposeSecret;
+
+    const ALNUM: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    /// Any 31-character alphanumeric raw token survives finalize -> parse, and
+    /// the finalized form has the expected prefix/length shape.
+    #[hegel::test(test_cases = 1000)]
+    fn prop_finalize_parse_roundtrip(tc: TestCase) {
+        let raw = tc.draw(gs::text().alphabet(ALNUM).min_size(31).max_size(31));
+        let finalized = AccessToken(raw.into()).finalize();
+        let token = finalized.expose_secret();
+
+        assert!(token.starts_with(AccessToken::PREFIX));
+        assert_eq!(token.len(), AccessToken::PREFIX.len() + 32);
+
+        let parsed = token.parse::<AccessToken>().unwrap();
+        assert_eq!(parsed.finalize().expose_secret(), token);
+    }
+
+    /// A generator biased towards token-shaped strings: arbitrary text, a
+    /// prefixed body with a random (usually wrong) checksum, and fully valid
+    /// finalized tokens. This hits both the accept and every reject branch.
+    fn token_like() -> impl hegel::Generator<String> {
+        hegel::compose!(|tc| {
+            match tc.draw(gs::integers::<u8>().min_value(0).max_value(2)) {
+                0 => tc.draw(gs::text().max_size(45)),
+                1 => {
+                    let body = tc.draw(gs::text().alphabet(ALNUM).min_size(32).max_size(32));
+                    format!("{}{body}", AccessToken::PREFIX)
+                }
+                _ => {
+                    let raw = tc.draw(gs::text().alphabet(ALNUM).min_size(31).max_size(31));
+                    AccessToken(raw.into())
+                        .finalize()
+                        .expose_secret()
+                        .to_string()
+                }
+            }
+        })
+    }
+
+    /// parse accepts *only* canonical tokens: whenever it succeeds, re-finalizing
+    /// reproduces the exact input. (It also never panics on arbitrary input.)
+    #[hegel::test(test_cases = 3000)]
+    fn prop_parse_accepts_only_canonical(tc: TestCase) {
+        let input = tc.draw(token_like());
+        if let Ok(token) = input.parse::<AccessToken>() {
+            assert_eq!(token.finalize().expose_secret(), &input);
+        }
+    }
+
+    /// The checksum is deterministic and always a single alphanumeric character,
+    /// for arbitrary byte input.
+    #[hegel::test(test_cases = 2000)]
+    fn prop_checksum_is_alphanumeric_and_deterministic(tc: TestCase) {
+        let bytes = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(64));
+        let first = checksum(&bytes);
+        assert_eq!(first, checksum(&bytes), "checksum is not deterministic");
+        assert!(first.is_ascii_alphanumeric(), "checksum {first:?} not alphanumeric");
+    }
+}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { GitStatusEntry } from '@pierre/trees';
+
   import { onMount } from 'svelte';
   import { FILE_TREE_ICONS } from '@crates-io/file-tree-icons';
   import { FileTree as PierreFileTree } from '@pierre/trees';
@@ -8,9 +10,10 @@
     selectedPath: string | null;
     onselect: (path: string) => void;
     colorScheme: 'light' | 'dark';
+    gitStatus?: readonly GitStatusEntry[];
   }
 
-  let { paths, selectedPath, onselect, colorScheme }: Props = $props();
+  let { paths, selectedPath, onselect, colorScheme, gitStatus }: Props = $props();
 
   let container = $state.raw<HTMLElement>();
   let tree = $state.raw<PierreFileTree>();
@@ -32,6 +35,7 @@
       flattenEmptyDirectories: true,
       search: true,
       stickyFolders: true,
+      gitStatus,
       onSelectionChange(p) {
         let path = p[0];
         if (path && path !== selectedPath) {
@@ -70,6 +74,10 @@
     if (container) {
       container.style.colorScheme = colorScheme;
     }
+  });
+
+  $effect(() => {
+    tree?.setGitStatus(gitStatus);
   });
 </script>
 

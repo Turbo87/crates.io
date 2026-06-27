@@ -19,6 +19,13 @@
     'tests/integration.rs',
   ];
 
+  const GIT_STATUS = [
+    { path: 'Cargo.lock', status: 'modified' },
+    { path: 'README.md', status: 'deleted' },
+    { path: 'src/main.rs', status: 'added' },
+    { path: 'src/core/de.rs', status: 'renamed' },
+  ] as const;
+
   const { Story } = defineMeta({
     title: 'FileTree',
     component: FileTree,
@@ -29,6 +36,7 @@
     args: {
       paths: PATHS,
       colorScheme: 'light',
+      gitStatus: GIT_STATUS,
       onselect: fn(),
     },
   });
@@ -49,6 +57,7 @@
           selectedPath = path;
         }}
         colorScheme={args.colorScheme}
+        gitStatus={args.gitStatus}
       />
     </div>
   {/snippet}

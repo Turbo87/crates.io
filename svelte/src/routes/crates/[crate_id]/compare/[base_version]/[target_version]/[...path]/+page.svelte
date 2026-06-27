@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { FileContents, FileDiffMetadata } from '@pierre/diffs';
   import type { GitStatusEntry } from '@pierre/trees';
-  import type { ManifestFile, LoadedFile } from '$lib/utils/zip-archive';
   import type { VersionDiffEntry } from '$lib/utils/version-diff';
+  import type { LoadedFile, ManifestFile } from '$lib/utils/zip-archive';
 
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -13,6 +13,8 @@
   import DiffViewer from '$lib/components/DiffViewer.svelte';
   import FileTree from '$lib/components/FileTree.svelte';
   import { loadFile } from '$lib/utils/zip-archive';
+
+  const DIFF_OPTIONS = { ignoreWhitespace: true } as const;
 
   type FileState =
     | { kind: 'loading' }
@@ -94,6 +96,8 @@
         fileState = { kind: 'unavailable' };
       } else if (metadata === 'binary') {
         fileState = { kind: 'message', message: `Binary file ${binaryVerb(entry.status)}.` };
+      } else if (entry.status === 'modified' && metadata.hunks.length === 0) {
+        fileState = { kind: 'message', message: 'No changes in this file.' };
       } else {
         fileState = { kind: 'diff', path, metadata, cacheKey: metadata.cacheKey ?? path };
       }
@@ -115,7 +119,7 @@
     if (base === null || target === null) return null;
     if (base.kind === 'binary' || target.kind === 'binary') return 'binary';
 
-    return parseDiffFromFile(fileContents(baseFile, base.text), fileContents(targetFile, target.text));
+    return parseDiffFromFile(fileContents(baseFile, base.text), fileContents(targetFile, target.text), DIFF_OPTIONS);
   }
 
   async function loadAddedDiff(entry: VersionDiffEntry): Promise<FileDiffMetadata | 'binary' | null> {
@@ -206,7 +210,9 @@
           {/if}
         </div>
       {:else if fileState.kind === 'unavailable'}
-        <div class="message" data-test-compare-unavailable>Source archive is not available for one or both versions.</div>
+        <div class="message" data-test-compare-unavailable>
+          Source archive is not available for one or both versions.
+        </div>
       {:else if fileState.kind === 'error'}
         <div class="error" data-test-load-error>Failed to load file diff: {fileState.message}</div>
       {/if}

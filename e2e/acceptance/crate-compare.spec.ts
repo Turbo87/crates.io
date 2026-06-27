@@ -95,6 +95,24 @@ test.describe('Acceptance | crate version compare', { tag: '@acceptance' }, () =
     await expect(page.locator('[data-test-compare-message]')).toContainText('Binary file changed.');
   });
 
+  test('ignores leading and trailing whitespace changes', async ({ page, msw }) => {
+    let crate = await msw.db.crate.create({ name: 'serde' });
+    await msw.db.version.create({
+      crate,
+      num: '1.0.0',
+      source_files: { 'src/lib.rs': 'pub fn answer() -> u32 { 42 }\n' },
+    });
+    await msw.db.version.create({
+      crate,
+      num: '1.0.1',
+      source_files: { 'src/lib.rs': '  pub fn answer() -> u32 { 42 }  \n' },
+    });
+
+    await page.goto('/crates/serde/compare/1.0.0/1.0.1/src/lib.rs');
+
+    await expect(page.locator('[data-test-compare-message]')).toContainText('No changes in this file.');
+  });
+
   test('shows compare-level and path errors', async ({ page, msw }) => {
     await publishComparedVersions(msw);
 

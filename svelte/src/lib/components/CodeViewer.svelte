@@ -1,12 +1,10 @@
 <script lang="ts">
   import type { CodeViewOptions, SelectedLineRange } from '@pierre/diffs';
-  import type { WorkerPoolManager } from '@pierre/diffs/worker';
 
   import { onMount, untrack } from 'svelte';
   import { CodeView } from '@pierre/diffs';
-  import { getOrCreateWorkerPoolSingleton } from '@pierre/diffs/worker';
-  import WorkerUrl from '@pierre/diffs/worker/worker.js?worker&url';
 
+  import { CODE_VIEW_THEMES, getCodeViewHighlighterPool } from '$lib/utils/code-view';
   import { registerCustomExtensions } from '$lib/utils/syntax-language';
 
   interface Props {
@@ -18,8 +16,6 @@
 
   let { content, colorScheme, lineHash = '', onLineHashChange }: Props = $props();
 
-  const THEMES = { light: 'github-light', dark: 'github-dark' } as const;
-
   const LINE_HASH_PATTERN = /^L([1-9]\d*)(?:-L([1-9]\d*))?$/;
 
   let container = $state.raw<HTMLElement>();
@@ -28,7 +24,7 @@
 
   function options(): CodeViewOptions<undefined> {
     return {
-      theme: THEMES,
+      theme: CODE_VIEW_THEMES,
       themeType: colorScheme,
       overflow: 'scroll',
       layout: {
@@ -43,19 +39,6 @@
       },
       renderHeaderMetadata: () => content?.meta ?? null,
     };
-  }
-
-  function getHighlighterPool(): WorkerPoolManager {
-    return getOrCreateWorkerPoolSingleton({
-      poolOptions: {
-        workerFactory: () => new Worker(WorkerUrl, { type: 'module' }),
-        poolSize: 1,
-      },
-      highlighterOptions: {
-        theme: THEMES,
-        langs: ['rust', 'toml'],
-      },
-    });
   }
 
   function parseLineHash(hash: string): SelectedLineRange | null {
@@ -78,7 +61,7 @@
 
   onMount(() => {
     registerCustomExtensions();
-    view = new CodeView(options(), getHighlighterPool());
+    view = new CodeView(options(), getCodeViewHighlighterPool());
     view.setup(container!);
     return () => view?.cleanUp();
   });

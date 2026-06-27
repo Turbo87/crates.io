@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { CodeView } from '@pierre/diffs';
 
-  import { CODE_VIEW_THEMES, getCodeViewHighlighterPool } from '$lib/utils/code-view';
+  import { CODE_VIEW_THEMES } from '$lib/utils/code-view';
   import { registerCustomExtensions } from '$lib/utils/syntax-language';
 
   interface Props {
@@ -33,7 +33,7 @@
 
   onMount(() => {
     registerCustomExtensions();
-    view = new CodeView(options(), getCodeViewHighlighterPool());
+    view = new CodeView(options());
     view.setup(container!);
     return () => view?.cleanUp();
   });

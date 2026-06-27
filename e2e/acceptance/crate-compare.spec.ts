@@ -40,6 +40,11 @@ test.describe('Acceptance | crate version compare', { tag: '@acceptance' }, () =
     await expect(page.getByText('7 changed files')).toBeVisible();
     await expect(page.getByRole('region', { name: 'File diff' })).toContainText('41');
     await expect(page.getByRole('region', { name: 'File diff' })).toContainText('42');
+    await page.waitForFunction(() =>
+      document
+        .querySelector('[data-test-diff-viewer] diffs-container')
+        ?.shadowRoot?.querySelector('span[style*="--diffs-token"]'),
+    );
     await expect(page.getByRole('treeitem', { name: /lib\.rs/, selected: true })).toBeVisible();
 
     await percy.snapshot();

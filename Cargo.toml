@@ -42,6 +42,17 @@ ignored = ["astral-tokio-tar"]
 [lints]
 workspace = true
 
+[profile.dev]
+# Full DWARF debuginfo roughly doubles the codegen + link time of a crate the
+# size of `crates_io`, and every dependency pays it too. `line-tables-only`
+# keeps file/line numbers in panic backtraces and `RUST_BACKTRACE` output while
+# dropping the bulk of that cost, and `unpacked` split-debuginfo keeps the debug
+# data out of the linker's inputs so linking the many test binaries is faster.
+# (CI already sets `CARGO_PROFILE_DEV_DEBUG=line-tables-only` for the test job;
+# this makes local builds and the other CI jobs benefit as well.)
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
 [profile.dev.package]
 insta.opt-level = 3
 similar.opt-level = 3

@@ -67,6 +67,29 @@ Admin CLI (check crate ownership, manage users, etc.):
 cargo run --bin crates-admin -- <subcommand>
 ```
 
+### Build performance
+
+The `[profile.dev]` in `Cargo.toml` builds with `debug = "line-tables-only"`
+instead of full DWARF debuginfo. This keeps file/line numbers in panic
+backtraces and `RUST_BACKTRACE` output while roughly halving the debuginfo
+that has to be generated and linked for a crate the size of `crates_io`. If you
+need full debuginfo for a debugger session, override it locally with
+`CARGO_PROFILE_DEV_DEBUG=full cargo build`.
+
+Linking the `crates_io` binaries and the many per-crate test binaries is a
+serial part of the build's critical path. Installing a faster linker and
+opting into it locally shaves several more seconds off every incremental
+build. LLD ships with the LLVM toolchain; [`mold`](https://github.com/rui314/mold)
+is faster still. This is intentionally opt-in (via a git-ignored
+`.cargo/config.toml`) rather than committed, so it does not become a hard
+requirement for CI or other contributors:
+
+```toml
+# .cargo/config.toml (git-ignored, local only)
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]   # or "-fuse-ld=mold"
+```
+
 ### Testing
 
 Run backend tests (with separate test database):

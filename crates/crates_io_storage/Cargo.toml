@@ -1,0 +1,24 @@
+[package]
+name = "crates_io_storage"
+version = "0.0.0"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "=1.0.103"
+crates_io_env_vars = { path = "../crates_io_env_vars" }
+crates_io_index = { path = "../crates_io_index" }
+dotenvy = "=0.15.7"
+futures-util = "=0.3.32"
+hyper = { version = "=1.10.1", features = ["client", "http1"] }
+object_store = { version = "=0.14.0", features = ["aws"] }
+secrecy = "=0.10.3"
+tokio = { version = "=1.52.3", features = ["io-util"] }
+tracing = "=0.1.44"
+
+[dev-dependencies]
+claims = "=0.8.0"
+tokio = { version = "=1.52.3", features = ["macros", "rt-multi-thread"] }

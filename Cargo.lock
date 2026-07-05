@@ -1780,6 +1780,7 @@ dependencies = [
  "crates_io_pagerduty",
  "crates_io_real_ip",
  "crates_io_session",
+ "crates_io_storage",
  "crates_io_tarball",
  "crates_io_team_repo",
  "crates_io_test_db",
@@ -2171,6 +2172,23 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "crates_io_storage"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "claims",
+ "crates_io_env_vars",
+ "crates_io_index",
+ "dotenvy",
+ "futures-util",
+ "hyper",
+ "object_store",
+ "secrecy",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

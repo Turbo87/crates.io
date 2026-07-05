@@ -6,6 +6,7 @@
 pub use crate::{app::App, email::Emails};
 pub use crates_io_api_types as views;
 pub use crates_io_database::{models, schema};
+pub use crates_io_storage as storage;
 use std::sync::Arc;
 
 use crate::app::AppState;
@@ -35,7 +36,6 @@ mod router;
 pub mod sentry;
 pub mod sqs;
 pub mod ssh;
-pub mod storage;
 pub mod tasks;
 pub mod typosquat;
 pub mod util;

@@ -1,8 +1,9 @@
 use crate::middleware::app::RequestApp;
 use crate::middleware::log_request::RequestLogExt;
+use crate::util::RequestPartsExt;
 use crate::util::errors::{AppResult, forbidden};
 use http::request::Parts;
-use http::{Extensions, HeaderMap, HeaderValue, Method, Request, Uri, Version, header};
+use http::header;
 
 /// The Origin header (<https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin>)
 /// is sent with CORS requests and POST requests, and indicates where the request comes from.
@@ -30,46 +31,3 @@ pub fn verify_origin(parts: &Parts) -> AppResult<()> {
     Ok(())
 }
 
-pub trait RequestPartsExt {
-    fn method(&self) -> &Method;
-    fn uri(&self) -> &Uri;
-    fn version(&self) -> Version;
-    fn headers(&self) -> &HeaderMap<HeaderValue>;
-    fn extensions(&self) -> &Extensions;
-}
-
-impl RequestPartsExt for Parts {
-    fn method(&self) -> &Method {
-        &self.method
-    }
-    fn uri(&self) -> &Uri {
-        &self.uri
-    }
-    fn version(&self) -> Version {
-        self.version
-    }
-    fn headers(&self) -> &HeaderMap<HeaderValue> {
-        &self.headers
-    }
-    fn extensions(&self) -> &Extensions {
-        &self.extensions
-    }
-}
-
-impl<B> RequestPartsExt for Request<B> {
-    fn method(&self) -> &Method {
-        self.method()
-    }
-    fn uri(&self) -> &Uri {
-        self.uri()
-    }
-    fn version(&self) -> Version {
-        self.version()
-    }
-    fn headers(&self) -> &HeaderMap<HeaderValue> {
-        self.headers()
-    }
-    fn extensions(&self) -> &Extensions {
-        self.extensions()
-    }
-}

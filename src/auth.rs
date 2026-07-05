@@ -1,5 +1,5 @@
 use crate::controllers;
-use crate::controllers::util::RequestPartsExt;
+use crate::util::RequestPartsExt;
 use crate::middleware::log_request::RequestLogExt;
 use crate::models::token::{CrateScope, EndpointScope};
 use crate::models::{ApiToken, User};

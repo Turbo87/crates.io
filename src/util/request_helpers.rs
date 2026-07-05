@@ -1,10 +1,60 @@
-use crate::controllers::util::RequestPartsExt;
 use axum::response::{IntoResponse, Response};
 use axum_extra::TypedHeader;
 use axum_extra::headers::CacheControl;
 use http::header::AsHeaderName;
-use http::{HeaderMap, StatusCode, header};
+use http::request::Parts;
+use http::{
+    Extensions, HeaderMap, HeaderValue, Method, Request, StatusCode, Uri, Version, header,
+};
 use indexmap::IndexMap;
+
+/// Abstraction over the parts of an HTTP request that both [`http::request::Parts`]
+/// and a full [`http::Request`] can provide. Defined here in the `util`
+/// foundation so lower-level helpers can use it without depending on the
+/// controller/middleware layers.
+pub trait RequestPartsExt {
+    fn method(&self) -> &Method;
+    fn uri(&self) -> &Uri;
+    fn version(&self) -> Version;
+    fn headers(&self) -> &HeaderMap<HeaderValue>;
+    fn extensions(&self) -> &Extensions;
+}
+
+impl RequestPartsExt for Parts {
+    fn method(&self) -> &Method {
+        &self.method
+    }
+    fn uri(&self) -> &Uri {
+        &self.uri
+    }
+    fn version(&self) -> Version {
+        self.version
+    }
+    fn headers(&self) -> &HeaderMap<HeaderValue> {
+        &self.headers
+    }
+    fn extensions(&self) -> &Extensions {
+        &self.extensions
+    }
+}
+
+impl<B> RequestPartsExt for Request<B> {
+    fn method(&self) -> &Method {
+        self.method()
+    }
+    fn uri(&self) -> &Uri {
+        self.uri()
+    }
+    fn version(&self) -> Version {
+        self.version()
+    }
+    fn headers(&self) -> &HeaderMap<HeaderValue> {
+        self.headers()
+    }
+    fn extensions(&self) -> &Extensions {
+        self.extensions()
+    }
+}
 
 pub trait HeaderMapExt {
     /// Returns the value of the request header, or an empty slice if it is not

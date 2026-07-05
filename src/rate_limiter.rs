@@ -88,7 +88,7 @@ impl RateLimiter {
             Ok(())
         } else {
             Err(Box::new(TooManyRequests {
-                action: performed_action,
+                action_message: performed_action.error_message(),
                 retry_after: bucket.last_refill
                     + chrono::Duration::from_std(self.config_for_action(performed_action).rate)
                         .unwrap(),

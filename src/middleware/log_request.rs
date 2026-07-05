@@ -1,7 +1,6 @@
 //! Log all requests in a format similar to Heroku's router, but with additional
 //! information that we care about like User-Agent
 
-use crate::controllers::util::RequestPartsExt;
 use crate::headers::XRequestId;
 use crate::middleware::normalize_path::OriginalPath;
 use crate::middleware::real_ip::RealIp;
@@ -22,11 +21,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::{Level, event};
 
-#[derive(Clone, Debug)]
-pub struct ErrorField(pub String);
-
-#[derive(Clone, Debug)]
-pub struct CauseField(pub String);
+use crate::util::RequestPartsExt;
+use crate::util::errors::{CauseField, ErrorField};
 
 #[derive(axum::extract::FromRequestParts)]
 pub struct RequestMetadata {

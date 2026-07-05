@@ -6,8 +6,7 @@ use std::fmt;
 
 use super::{AppError, BoxedAppError};
 
-use crate::middleware::log_request::CauseField;
-use crate::rate_limiter::LimitedAction;
+use super::CauseField;
 use chrono::{DateTime, Utc};
 use http::{StatusCode, header};
 
@@ -46,7 +45,9 @@ impl AppError for CustomApiError {
 
 #[derive(Debug)]
 pub(crate) struct TooManyRequests {
-    pub action: LimitedAction,
+    /// The rate-limit error message to render (supplied by the rate limiter, so
+    /// this error type does not depend on the `rate_limiter` module).
+    pub action_message: &'static str,
     pub retry_after: DateTime<Utc>,
 }
 
@@ -57,7 +58,7 @@ impl AppError for TooManyRequests {
 
         let detail = format!(
             "{}. Please try again after {retry_after} and see https://crates.io/docs/rate-limits for more details.",
-            self.action.error_message()
+            self.action_message
         );
         let mut response = json_error(&detail, StatusCode::TOO_MANY_REQUESTS);
         response.headers_mut().insert(

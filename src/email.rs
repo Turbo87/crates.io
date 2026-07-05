@@ -1,5 +1,7 @@
 use crate::Env;
 use crate::config;
+use crate::util::errors::{BoxedAppError, server_error};
+use tracing::error;
 use lettre::address::Envelope;
 use lettre::message::Mailbox;
 use lettre::message::MultiPart;
@@ -315,6 +317,19 @@ pub enum EmailError {
     MessageBuilderError(#[from] lettre::error::Error),
     #[error(transparent)]
     TransportError(anyhow::Error),
+}
+
+impl From<EmailError> for BoxedAppError {
+    fn from(error: EmailError) -> Self {
+        match error {
+            EmailError::AddressError(error) => Box::new(error),
+            EmailError::MessageBuilderError(error) => Box::new(error),
+            EmailError::TransportError(error) => {
+                error!("Failed to send email: {error}");
+                server_error("Failed to send the email")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -19,7 +19,6 @@ use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 
-use crate::middleware::log_request::ErrorField;
 use axum::Extension;
 use chrono::{DateTime, Utc};
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
@@ -29,7 +28,6 @@ use tracing::error;
 
 mod json;
 
-use crate::email::EmailError;
 use crate::util::diesel::is_read_only_error;
 use crates_io_github::GitHubError;
 pub use json::TOKEN_FORMAT_ERROR;
@@ -105,6 +103,17 @@ impl dyn AppError {
     }
 }
 
+/// Request extension carrying the error message for the request-logging
+/// middleware to pick up. It lives in the error layer (rather than in the
+/// middleware) so the error types do not depend on the web/middleware layer.
+#[derive(Clone, Debug)]
+pub struct ErrorField(pub String);
+
+/// Request extension carrying a human-readable cause for the request-logging
+/// middleware to pick up. See [`ErrorField`] for why it lives here.
+#[derive(Clone, Debug)]
+pub struct CauseField(pub String);
+
 impl AppError for BoxedAppError {
     fn response(&self) -> axum::response::Response {
         (**self).response()
@@ -154,19 +163,6 @@ impl From<DieselError> for BoxedAppError {
                 service_unavailable()
             }
             _ => Box::new(err),
-        }
-    }
-}
-
-impl From<EmailError> for BoxedAppError {
-    fn from(error: EmailError) -> Self {
-        match error {
-            EmailError::AddressError(error) => Box::new(error),
-            EmailError::MessageBuilderError(error) => Box::new(error),
-            EmailError::TransportError(error) => {
-                error!("Failed to send email: {error}");
-                server_error("Failed to send the email")
-            }
         }
     }
 }

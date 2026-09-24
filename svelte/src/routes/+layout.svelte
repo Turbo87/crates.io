@@ -1,5 +1,8 @@
 <script lang="ts">
+  import type { Component } from 'svelte';
+
   import { onMount } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import { navigating, page } from '$app/state';
   import { createClient } from '@crates-io/api-client';
 
@@ -26,6 +29,28 @@
   let propsId = $props.id();
 
   let isIndex = $derived(page.route.id === '/');
+
+  let loadingTetris = false;
+  let Tetris = $state.raw<Component<{ onClose: () => void }> | null>(null);
+
+  async function showTetris() {
+    if (loadingTetris || Tetris) return;
+    loadingTetris = true;
+    try {
+      Tetris = (await import('$lib/components/tetris/Tetris.svelte')).default;
+    } finally {
+      loadingTetris = false;
+    }
+  }
+
+  afterNavigate(navigation => {
+    if (
+      navigation.to?.route.id === '/search' &&
+      navigation.to.url.searchParams.get('q')?.trim().toLowerCase() === 'tetris'
+    ) {
+      void showTetris();
+    }
+  });
 
   let colorScheme = new ColorSchemeState();
   setColorScheme(colorScheme);
@@ -130,6 +155,10 @@
 </main>
 
 <Footer />
+
+{#if Tetris}
+  <Tetris onClose={() => (Tetris = null)} />
+{/if}
 
 <style>
   .main {
